@@ -55,7 +55,9 @@ needs the ticket to find the laptop.
 
 ## Setup
 
-You need three things: a name, a relay, and the tools on your laptop.
+You need three things: a name, a relay, and the tools on your laptop. To have a
+coding agent walk you through it, give it [SETUP.md](SETUP.md). It explains each
+step and checks the result, and you make the accounts.
 
 ### 1. The laptop
 

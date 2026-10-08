@@ -19,6 +19,7 @@ repository holds the glue.
 | `install.sh` | The relay side. It installs dumbpipe and a systemd service. |
 | `.regenerate/` | The spec, the decisions, the rebuild prompt and the spec suite. See its [README](.regenerate/README.md). |
 | `test/` | The end-to-end test, in Docker, with Pebble as the CA. The spec suite runs it. |
+| `SETUP.md` | The guide an agent follows to set dumbtunnel up with a person. |
 | `.github/` | CI for the spec suite, and the Dependabot config. |
 
 ## Commands
@@ -68,7 +69,7 @@ skill to interview the user before you write code.
   workflow files. Do not repeat them anywhere else.
 - **Ask before adding a dependency**, on the laptop, on the relay or in CI.
 - **Keep the docs in step.** A change in behavior updates the scripts,
-  `.regenerate/SPEC.md`, the spec suite and `README.md` together. A new
+  `.regenerate/SPEC.md`, the spec suite, `README.md` and `SETUP.md` together. A new
   design choice gets an entry in `.regenerate/DECISIONS.md`.
 
 ## Tests
