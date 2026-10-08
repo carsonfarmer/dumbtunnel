@@ -183,8 +183,8 @@ run finish ticket
 [ "$(grep -c . "$c/out")" = 1 ] || fail "want one line on stdout"
 first=$(cat "$c/out")
 short "$first" || fail "not a short ticket: $first"
-[ "$(grep -cxE '[0-9a-f]{64}' "$dir/secret")" = 1 ] && [ "$(grep -c '' "$dir/secret")" = 1 ] ||
-	fail "secret is not 64 lowercase hex digits"
+[ "$(grep -cxE '[0-9a-f]{64}' "$dir/secret")" = 1 ] || fail "secret is not 64 lowercase hex digits"
+[ "$(grep -c '' "$dir/secret")" = 1 ] || fail "secret is not one line"
 [ "$(stat -c %a "$dir/secret")" = 600 ] || fail "secret has mode $(stat -c %a "$dir/secret"), want 600"
 after "$c" 8443
 cp "$dir/secret" "$T/secret"
