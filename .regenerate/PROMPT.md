@@ -30,7 +30,7 @@ Nothing else. No README, no tests in the workspace, no CI files.
    `caddyserver.com/docs` or its source at `github.com/caddyserver/caddy`. Do not
    guess them from memory.
 3. Write the smallest scripts that satisfy `SPEC.md`. The goal is the fewest custom
-   lines. `dumbtunnel` must stay within 60 lines of code and `install.sh` within 40,
+   lines. `dumbtunnel` and `install.sh` must each stay within 40 lines of code,
    counted as section 2 of the spec says. dumbpipe and Caddy do the real work. If a
    script is getting long, look in them for something that does the job.
 4. Write POSIX `sh` that runs under macOS `/bin/sh`, dash and busybox `ash`. No bash

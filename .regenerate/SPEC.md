@@ -36,7 +36,7 @@ for the user's Caddyfile. All the real work is done by dumbpipe and Caddy.
 | Caddy | 2.11 or later, as `caddy` on `PATH` |
 | Shell | POSIX `sh`. The scripts MUST run under macOS `/bin/sh`, dash and busybox `ash`. |
 | Files | `dumbtunnel`, which is executable, `install.sh` and `Caddyfile.example`. Each script starts with the line `#!/bin/sh`. |
-| Size | `dumbtunnel` at most 60 lines of code, `install.sh` at most 40 |
+| Size | `dumbtunnel` and `install.sh` at most 40 lines of code each |
 | Lint | shellcheck, with no findings at its default severity |
 | License | MIT (unchanged) |
 

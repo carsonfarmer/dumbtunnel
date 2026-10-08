@@ -20,7 +20,7 @@ static() {
 	done
 	[ -x dumbtunnel ] || { echo "dumbtunnel is not executable" && ok=1; }
 	# Counts lines that are neither blank nor comments.
-	for budget in dumbtunnel:60 install.sh:40; do
+	for budget in dumbtunnel:40 install.sh:40; do
 		f=${budget%:*} max=${budget#*:}
 		lines=$(grep -cvE '^[[:space:]]*(#|$)' "$f")
 		echo "$f: $lines of $max lines"

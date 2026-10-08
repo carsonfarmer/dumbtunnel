@@ -12,8 +12,8 @@ decision and the reason for it.
 
 D1. **Build the smallest thing that does the job.** dumbtunnel is glue. dumbpipe and
 Caddy do the work, and the scripts start them and pass one string between them. The
-budget is 60 lines for `dumbtunnel` and 40 for `install.sh`. Recorded (build session;
-README intro).
+budget is 40 lines of code for each script. `dumbtunnel` had 60 until D22 brought it
+to 24, and the budget came down with it. Recorded (build session; README intro).
 
 D2. **Come as close to opentunnel.xyz as a free setup can.** A public HTTPS name for a
 local port, with the TLS key on the laptop and a relay that cannot read the traffic.

@@ -45,10 +45,10 @@ skill to interview the user before you write code.
 
 ## Rules
 
-- **Stay inside the size budget.** `dumbtunnel` has at most 60 lines of code and
-  `install.sh` at most 40, counting lines that are neither blank nor comments. CI
-  fails when one goes over. When code grows, look in dumbpipe or Caddy for something that
-  already does the job.
+- **Stay inside the size budget.** `dumbtunnel` and `install.sh` have at most 40 lines
+  of code each, counting lines that are neither blank nor comments. CI fails when one
+  goes over. When code grows, look in dumbpipe or Caddy for something that already
+  does the job.
 - **Stay POSIX.** The scripts run under `/bin/sh` on macOS and on busybox. Do not
   use bash features or GNU-only flags. busybox `sed` reads ahead, so do not use it
   on the FIFO.
