@@ -47,8 +47,9 @@ esac
 
 rm -f "$dir/fifo" && mkfifo "$dir/fifo"
 IROH_SECRET=$(cat "$dir/secret") dumbpipe listen-tcp -v --host "127.0.0.1:${DUMBTUNNEL_PORT:-8443}" >&2 2>"$dir/fifo" &
-pid=$!
-trap 'rm -f "$dir/fifo"; kill $pid 2>/dev/null || :' EXIT
+pids=$!
+trap 'rm -f "$dir/fifo"; kill $pids 2>/dev/null || :' EXIT
+trap 'exit 129' HUP
 trap 'exit 130' INT TERM
 
 # Once online, dumbpipe prints a short ticket: the laptop's ID and its iroh
@@ -62,4 +63,8 @@ if [ "${1:-}" = ticket ]; then
 fi
 echo "ticket: $ticket"
 cat <&3 >&2 &
-caddy run --config "$dir/Caddyfile" --adapter caddyfile
+# Caddy ignores SIGHUP, so it runs in the background, where the traps can stop
+# it when the terminal closes.
+caddy run --config "$dir/Caddyfile" --adapter caddyfile &
+pids="$pids $!"
+wait $!
