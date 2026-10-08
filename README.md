@@ -166,11 +166,12 @@ dumbertunnel NAME PORT    serve localhost:PORT at https://NAME
 dumbertunnel NAME DIR     serve the files in DIR at https://NAME
 ```
 
-- A folder gets a listing of its files. A path with a dot file or folder in it,
-  such as `.git` or `.env`, gets a 404, but the listing still shows the name.
-- The Caddyfile is `dumbertunnel.Caddyfile` in `DUMBTUNNEL_DIR`, and each run
-  replaces it. To add a site or change a setting, copy it and run `dumbtunnel` on
-  the copy.
+- A folder is served as plain files, with `index.html` at `/`. There is no
+  listing, so a folder without an `index.html` gets a 404. So does any path with a
+  dot file or folder in it, such as `.git` or `.env`.
+- Each run writes the Caddyfile to `dumbertunnel.Caddyfile` in `DUMBTUNNEL_DIR`.
+  For more than one site, or any other setting, write a Caddyfile from
+  `Caddyfile.example` and run `dumbtunnel`.
 - The variables above work the same way. For example,
   `DUMBTUNNEL_ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory dumbertunnel api.you.duckdns.org`
   tries a name on staging.

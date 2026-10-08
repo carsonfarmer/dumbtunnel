@@ -67,9 +67,10 @@ skill to interview the user before you write code.
   global block of `Caddyfile.example`.
 - **Keep `dumbertunnel` outside the contract.** It is a helper. The spec, the
   decisions, the spec suite and the size budget do not cover it, and a rebuild
-  leaves it alone. Its global block is a copy of the one in `Caddyfile.example`, so
-  change the two together. CI only runs shellcheck on it, so try a change to it by
-  hand, in Docker.
+  leaves it alone. It writes its own copy of the first block of
+  `Caddyfile.example`, the settings that make Caddy work through the relay, so a
+  change to that block goes in both. CI only runs shellcheck on it, so try a change
+  to it by hand, in Docker.
 - **Keep versions in one place.** The dumbpipe release is named in section 2 of
   `.regenerate/SPEC.md` and in `install.sh`, and the spec suite checks that they
   agree. Image versions live in `test/Dockerfile`, and action versions in the
