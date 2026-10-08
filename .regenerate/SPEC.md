@@ -13,18 +13,20 @@ this file was silent or vague, fix this file and run the rebuild again.
 
 ## 1. Purpose
 
-Serve ports on a laptop at public HTTPS names, through a relay that sees only
+Serve sites from a laptop at public HTTPS names, through a relay that sees only
 encrypted bytes.
 
 - The **relay** is a Linux VM with a public IPv4 address. It runs stock
   `dumbpipe connect-tcp`, which accepts TCP connections on port 443 and sends each
   one over iroh to the laptop. It holds no certificate and decrypts nothing.
 - The **laptop** runs `dumbpipe listen-tcp`, which hands each connection to Caddy.
-  Caddy ends TLS, gets certificates from Let's Encrypt, and sends each request to a
-  local port chosen by hostname.
+  Caddy ends TLS, gets certificates from Let's Encrypt, and serves the sites in the
+  user's Caddyfile, such as a reverse proxy to a local port.
 
-The deliverable is two POSIX shell scripts: `dumbtunnel` for the laptop and
-`install.sh` for the relay. All the real work is done by dumbpipe and Caddy.
+dumbtunnel is `caddy run`, reachable from the internet through a server that cannot
+read the traffic. The deliverable is two POSIX shell scripts, `dumbtunnel` for the
+laptop and `install.sh` for the relay, and `Caddyfile.example`, the starting point
+for the user's Caddyfile. All the real work is done by dumbpipe and Caddy.
 
 ## 2. Inputs that are fixed
 
@@ -33,7 +35,7 @@ The deliverable is two POSIX shell scripts: `dumbtunnel` for the laptop and
 | dumbpipe | `v0.39.0`, the official release binaries from `github.com/n0-computer/dumbpipe` |
 | Caddy | 2.11 or later, as `caddy` on `PATH` |
 | Shell | POSIX `sh`. The scripts MUST run under macOS `/bin/sh`, dash and busybox `ash`. |
-| Files | `dumbtunnel`, which is executable, and `install.sh`. Each starts with the line `#!/bin/sh`. |
+| Files | `dumbtunnel`, which is executable, `install.sh` and `Caddyfile.example`. Each script starts with the line `#!/bin/sh`. |
 | Size | `dumbtunnel` at most 60 lines of code, `install.sh` at most 40 |
 | Lint | shellcheck, with no findings at its default severity |
 | License | MIT (unchanged) |
@@ -63,10 +65,11 @@ Ubuntu and busybox all have. They MUST NOT use bash features or GNU-only flags.
   See section 6.7 for where it comes from.
 - **Directory.** `DUMBTUNNEL_DIR`. When that is unset, `$XDG_CONFIG_HOME/dumbtunnel`,
   and when that is unset too, `$HOME/.config/dumbtunnel`.
-- **Port.** `DUMBTUNNEL_PORT`, `8443` when unset. Caddy serves HTTPS there, and
-  dumbpipe forwards to `127.0.0.1` at that port.
-- **Domain.** `DUMBTUNNEL_DOMAIN`, such as `you.duckdns.org`.
-- **Route.** One command-line argument of the form `[NAME=]TARGET`. See section 6.3.
+- **Port.** `DUMBTUNNEL_PORT`, `8443` when unset. dumbpipe forwards to `127.0.0.1`
+  at that port, and the example Caddyfile serves HTTPS there.
+- **Caddyfile.** The Caddy configuration that dumbtunnel serves: the file named on
+  its command line, or `Caddyfile` in the current directory. It belongs to the user,
+  who makes it from `Caddyfile.example`.
 
 ## 4. The path
 
@@ -81,13 +84,15 @@ browser ──TLS──▶ relay :443 ──iroh──▶ dumbpipe listen-tcp �
 - The relay finds the laptop with the short ticket. The relay URL in it lets the
   relay connect before iroh's DNS has published the laptop's address. After that,
   iroh finds the laptop by its endpoint ID even if its home relay changes.
-- The domain and every name under it point at the relay's IPv4 address. Setting that
-  up is outside the scripts.
+- Every name in the Caddyfile points at the relay's IPv4 address. Setting that up is
+  outside the scripts.
 
-## 5. Caddy configuration
+## 5. Caddyfile.example
 
-dumbtunnel runs Caddy with the `Caddyfile` in the directory, through Caddy's
-Caddyfile adapter. A Caddyfile that dumbtunnel writes MUST give this configuration:
+dumbtunnel runs Caddy with the user's Caddyfile, through Caddy's Caddyfile adapter.
+It does not write, check or change that file. `Caddyfile.example` is where the user
+starts. Caddy MUST accept it unchanged, and served unchanged it MUST give this
+configuration:
 
 1. **No admin endpoint.** Nothing listens on Caddy's admin port.
 2. **HTTPS on the port.** Caddy MUST accept TLS connections on `127.0.0.1:PORT` and
@@ -100,12 +105,14 @@ Caddyfile adapter. A Caddyfile that dumbtunnel writes MUST give this configurati
    `https://acme-v02.api.letsencrypt.org/directory`. There is no ZeroSSL issuer and
    no internal issuer. The HTTP-01 challenge is disabled, and no DNS challenge is
    set, so TLS-ALPN-01 is the only one left.
-6. **One site per route.** Each route's host is served by a reverse proxy to its
-   upstream.
-7. **The CA and the port come from the environment when Caddy starts.** The
-   Caddyfile does not contain their current values. It reads `DUMBTUNNEL_ACME_CA`
-   and `DUMBTUNNEL_PORT` each time Caddy starts, with the defaults above when they
-   are unset. So a later run with no arguments uses the values set at that time.
+6. **One sample site.** `api.you.duckdns.org`, a reverse proxy to `localhost:3000`.
+   More samples MAY appear in comments.
+7. **The CA and the port come from the environment when Caddy starts.** The file
+   reads `DUMBTUNNEL_ACME_CA` and `DUMBTUNNEL_PORT` through Caddy's `{$VAR:default}`
+   placeholders, with the defaults above.
+
+Rules 1 to 5 and 7 live in one global options block. A comment MUST tell the user to
+copy the file to `Caddyfile`, change the sites to their own, and keep that block.
 
 Caddy keeps certificates and its ACME account in its default data directory.
 dumbtunnel does not change where that is.
@@ -115,12 +122,13 @@ dumbtunnel does not change where that is.
 ### 6.1 Synopsis
 
 ```text
-dumbtunnel ROUTE...    write the Caddyfile for these routes, then serve
-dumbtunnel             serve with the Caddyfile already in the directory
-dumbtunnel ticket      print the ticket and exit
+dumbtunnel [CADDYFILE]   serve the sites in CADDYFILE, ./Caddyfile by default
+dumbtunnel ticket        print the ticket and exit
 ```
 
 ### 6.2 Every mode
+
+Once the arguments are accepted (6.3), and before dumbpipe starts:
 
 1. Create the directory, with its parents, if it does not exist.
 2. If `secret` in the directory is missing or empty, write a new secret to it from
@@ -135,55 +143,24 @@ dumbtunnel ticket      print the ticket and exit
 ### 6.3 Arguments
 
 - **`ticket`** as the first argument selects ticket mode (6.5). Later arguments MAY
-  be ignored.
-- **No arguments.** If there is no `Caddyfile` in the directory, write a usage line
-  that starts with `usage: dumbtunnel` to stderr and exit with status 2. Otherwise
-  serve (6.4) with that Caddyfile, unchanged. `DUMBTUNNEL_DOMAIN` is not needed.
-- **One or more routes.** If `DUMBTUNNEL_DOMAIN` is unset or empty, exit with a
-  nonzero status and a message on stderr that names `DUMBTUNNEL_DOMAIN`. Write no
-  Caddyfile and nothing on stdout. Otherwise write a new Caddyfile for the routes,
-  replacing any that exists, and print one line per route on stdout, in the order
-  given:
-
-  ```text
-  https://HOST -> UPSTREAM
-  ```
-
-  Then serve (6.4).
-
-A route is `TARGET` or `NAME=TARGET`, split at the first `=`:
-
-| Route | HOST | UPSTREAM |
-| --- | --- | --- |
-| `3000` | the domain | `localhost:3000` |
-| `api=3001` | `api.` and the domain | `localhost:3001` |
-| `db=otherhost:5432` | `db.` and the domain | `otherhost:5432` |
-
-A TARGET of only digits is a port on `localhost`. Any other TARGET is used as the
-upstream as written. dumbtunnel does not check routes further. Caddy rejects bad ones
-when it starts.
-
-With `DUMBTUNNEL_DOMAIN=example.test`, `dumbtunnel 3000 api=3001 db=otherhost:5432`
-prints:
-
-```text
-https://example.test -> localhost:3000
-https://api.example.test -> localhost:3001
-https://db.example.test -> otherhost:5432
-ticket: endpoint...
-```
+  be ignored. To serve a Caddyfile named `ticket`, give it as `./ticket`.
+- **Anything else** is the path of the Caddyfile, relative to the current directory.
+  With no argument it is `Caddyfile`. Later arguments MAY be ignored.
+- If no regular file is at that path, write a usage line that starts with
+  `usage: dumbtunnel` to stderr and exit with status 2, with nothing on stdout and
+  before starting anything. Otherwise serve (6.4) with that file. Caddy reads it as a
+  Caddyfile, whatever its name.
 
 ### 6.4 Serving
 
 1. Start `dumbpipe listen-tcp`, forwarding to `127.0.0.1:PORT`, with the secret.
 2. Wait for dumbpipe to give the short ticket (6.7), then print `ticket: TICKET` on
    stdout.
-3. Start Caddy with the Caddyfile. Caddy SHOULD start only after step 2, so that
-   its first certificate challenge can reach the laptop.
+3. Start Caddy with the Caddyfile, through its Caddyfile adapter. Caddy SHOULD start
+   only after step 2, so that its first certificate challenge can reach the laptop.
 4. Keep running. dumbpipe's and Caddy's logs go to stderr.
 
-stdout carries only the route lines and the ticket line. Everything else goes to
-stderr.
+stdout carries only the ticket line. Everything else goes to stderr.
 
 If dumbpipe exits before it gives the ticket, for example because it is not on
 `PATH`, dumbtunnel MUST exit with a nonzero status, print no ticket line, and not
@@ -195,7 +172,8 @@ alone or to its whole process group. It also stops when Caddy exits, such as whe
 Caddyfile is broken. When it stops, it MUST:
 
 - stop dumbpipe and Caddy, and anything else it started;
-- remove any file it made in the directory besides `secret` and `Caddyfile`;
+- remove any file it made in the directory besides `secret`, and leave the current
+  directory and the Caddyfile as they were;
 - exit with a nonzero status. The reference exits with 129 on SIGHUP, and 130 on
   SIGINT and SIGTERM.
 
@@ -206,19 +184,17 @@ free. Caddy ignores SIGHUP, so dumbtunnel has to stop it itself.
 
 Start dumbpipe as in 6.4, wait for the short ticket, and print exactly the ticket on
 one line on stdout, with no prefix. Then stop dumbpipe and exit with status 0. Do not
-start Caddy, and do not write or change the Caddyfile. `DUMBTUNNEL_DOMAIN` is not
-needed. Afterward nothing is left running, and the directory holds only what it held
-before plus `secret`. If dumbpipe exits first, fail as in 6.4, with nothing on
-stdout.
+start Caddy. Ticket mode needs no Caddyfile. Afterward nothing is left running, and
+the directory holds only what it held before plus `secret`. If dumbpipe exits first,
+fail as in 6.4, with nothing on stdout.
 
 ### 6.6 Environment
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `DUMBTUNNEL_DOMAIN` | none | The name that routes go under. Needed only to set routes. |
-| `DUMBTUNNEL_DIR` | see section 3 | Where `secret` and `Caddyfile` live. |
-| `DUMBTUNNEL_ACME_CA` | Let's Encrypt production | The ACME directory URL. Read by Caddy when it starts. |
-| `DUMBTUNNEL_PORT` | `8443` | The laptop port for Caddy and for dumbpipe's forwarding. |
+| `DUMBTUNNEL_DIR` | see section 3 | Where `secret` lives. |
+| `DUMBTUNNEL_PORT` | `8443` | Where dumbpipe forwards, on `127.0.0.1`. The example Caddyfile serves HTTPS there. |
+| `DUMBTUNNEL_ACME_CA` | Let's Encrypt production | The ACME directory URL. The example Caddyfile reads it when Caddy starts. dumbtunnel does not read it. |
 
 ### 6.7 What dumbpipe gives
 
@@ -322,33 +298,33 @@ listen on all interfaces within 30 seconds.
 1. On the laptop, `dumbtunnel ticket` prints the ticket.
 2. On the relay, `install.sh TICKET` installs dumbpipe and starts the service.
 3. The domain and its subdomains point at the relay.
-4. On the laptop, `DUMBTUNNEL_DOMAIN=you.duckdns.org dumbtunnel api=3000` writes
-   the Caddyfile, prints the route and the ticket, and serves. Caddy gets a
+4. On the laptop, the user copies `Caddyfile.example` to `Caddyfile` and puts their
+   own names in it.
+5. `dumbtunnel` in that directory prints the ticket line and serves. Caddy gets a
    certificate for each name at start.
-5. Ctrl-C stops dumbpipe and Caddy.
-6. Later, `dumbtunnel` with no arguments serves the same routes again. The secret is
-   the same, so the relay still works.
+6. Ctrl-C stops dumbpipe and Caddy.
+7. Later, `dumbtunnel` serves the same sites again. The secret is the same, so the
+   relay still works.
 
 ## 9. Observable strings
 
 | Where | Text |
 | --- | --- |
-| stdout, one per route | `https://HOST -> UPSTREAM` |
 | stdout, when serving | `ticket: TICKET` |
 | stdout, ticket mode | `TICKET` |
-| stderr, no arguments and no Caddyfile | starts with `usage: dumbtunnel`, exit status 2 |
-| stderr, routes without a domain | names `DUMBTUNNEL_DOMAIN`, nonzero exit status |
+| stderr, no file at the Caddyfile path | starts with `usage: dumbtunnel`, exit status 2 |
 | stderr, dumbpipe exits before the ticket | what dumbpipe wrote, nonzero exit status |
 | relay | the systemd unit `dumbtunnel.service` |
 
-The reference's usage line is `usage: dumbtunnel [NAME=]PORT... | dumbtunnel ticket`.
+The reference's usage line is `usage: dumbtunnel [CADDYFILE] | dumbtunnel ticket`.
 
 ## 10. State and files
 
 | Path | What it holds |
 | --- | --- |
 | `DIR/secret` | The secret, 64 lowercase hex characters. Mode `600` when dumbtunnel creates it. Never printed. |
-| `DIR/Caddyfile` | Written by a run with routes and read by a run without. The user MAY edit it. The next run with routes replaces it. |
+| The Caddyfile | The user's, wherever they keep it. dumbtunnel passes it to Caddy and never writes it. |
+| `Caddyfile.example` | In the repository. The user copies it. |
 | Caddy's data directory | Certificates and the ACME account. Caddy's default, set by Caddy and `XDG_DATA_HOME`, not by dumbtunnel. |
 | `/usr/local/bin/dumbpipe` | On the relay, from `install.sh`. |
 | `/etc/systemd/system/dumbtunnel.service` | On the relay, from `install.sh TICKET`. |
@@ -362,19 +338,19 @@ MUST be gone when it exits.
   challenge can fail, and Caddy retries a minute or more later.
 - Issuance from Let's Encrypt itself. The end-to-end test uses Pebble, Let's
   Encrypt's test CA.
-- A `HOST:PORT` target for the domain itself, and names with dots, such as
-  `a.b=3000`. Both work by the grammar above.
+- The comments in `Caddyfile.example`.
 - macOS. The suite runs on busybox. The scripts MUST still work under macOS
   `/bin/sh`, so try them there by hand.
 - `install.sh` on a real VM, with real systemd and iptables.
-- The order and content of stderr, beyond the usage and domain messages and
-  dumbpipe's error.
+- The order and content of stderr, beyond the usage line and dumbpipe's error.
 
 ## 12. Known limits
 
 Keep these. They are trade-offs, not bugs to fix.
 
 - If dumbpipe dies while Caddy runs, dumbtunnel keeps running with the tunnel down.
+- dumbtunnel does not check the Caddyfile. One without the example's global options
+  can open port 80, turn on HTTP/3, or use a challenge that cannot reach the laptop.
 - dumbtunnel reads the ticket from the text dumbpipe `v0.39.0` prints. A dumbpipe
   that prints it differently and keeps running leaves dumbtunnel waiting.
 - Caddy MAY listen on all interfaces, so machines on the same network can reach it
@@ -391,6 +367,7 @@ Keep these. They are trade-offs, not bugs to fix.
 
 - Code on the relay beyond stock dumbpipe, and TLS on the relay.
 - Authentication. Users add `basic_auth` to the Caddyfile themselves.
+- Writing or checking Caddy configuration. Caddy's own docs cover the Caddyfile.
 - Running dumbtunnel as a service on the laptop.
 - Windows.
 - Several laptops behind one relay, or routing by name on the relay.

@@ -8,8 +8,10 @@ set -u
 
 T=$(mktemp -d)
 export HOME="$T/home"
-mkdir -p "$HOME"
-unset DUMBTUNNEL_DOMAIN DUMBTUNNEL_DIR DUMBTUNNEL_PORT XDG_CONFIG_HOME XDG_DATA_HOME
+work=$T/work
+mkdir -p "$HOME" "$work"
+cd "$work" || exit 1
+unset DUMBTUNNEL_DIR DUMBTUNNEL_PORT XDG_CONFIG_HOME XDG_DATA_HOME
 export DUMBTUNNEL_ACME_CA=https://127.0.0.1:1/directory
 fails=$T/fails
 : >"$fails"
@@ -27,13 +29,14 @@ start() {
 	echo "== $name"
 }
 
-# run ACTOR ARGS... runs dumbtunnel ARGS in its own session, with ACTOR DIR
-# checking on it. dumbtunnel runs in the foreground, because a background
-# job here would ignore SIGINT. Its CA is a stand-in that records the first
-# bytes Caddy sends to DIR/ca.
+# run ACTOR ARGS... runs dumbtunnel ARGS in its own session, in the working
+# directory, with ACTOR DIR checking on it. dumbtunnel runs in the
+# foreground, because a background job here would ignore SIGINT. Its CA is a
+# stand-in that records the first bytes Caddy sends to DIR/ca.
 run() {
 	actor=$1
 	shift
+	ls -A "$work" >"$c/before"
 	caport=$((20000 + n))
 	nc -l -p "$caport" >"$c/ca" 2>/dev/null &
 	ca=$!
@@ -89,9 +92,8 @@ contacted() { [ -s "$1" ]; }
 
 # ready DIR waits for the ticket line.
 ready() {
-	within 60 ticketed "$1" && ! exited "$1" && return 0
-	fail "no ticket line within 60 seconds"
-	return 1
+	within 60 ticketed "$1" || { fail "no ticket line within 60 seconds"; return 1; }
+	! exited "$1" || { fail "exited with status $(status "$1") instead of serving"; return 1; }
 }
 
 # stop DIR SIGNAL [group] sends SIGNAL to dumbtunnel, or to its process
@@ -115,18 +117,28 @@ finish() {
 # stopped DIR checks the exit status after a signal or a failure.
 stopped() { [ "$(status "$1")" != 0 ] || fail "exit status 0 after a signal or a failure"; }
 
-# after DIR PORT FILES... checks that a run left nothing behind.
+# unchanged DIR MESSAGE fails with MESSAGE unless the working directory
+# holds what it held before the run.
+# shellcheck disable=SC2012 # The names are known and plain.
+unchanged() {
+	ls -A "$work" | cmp -s - "$1/before" || fail "$2: $(ls -A "$work" | tr '\n' ' ')"
+}
+
+# after DIR PORT checks that a run left nothing behind: only the secret in
+# the directory, the working directory as it was, and the Caddyfile in it
+# unchanged.
+# shellcheck disable=SC2012 # The names are known and plain.
 after() {
 	d=$1 port=$2
-	shift 2
 	within 10 quiet "$(sid "$d")" || {
 		fail "processes left running: $(alive "$(sid "$d")" | tr '\n' ' ')"
 		kill -s KILL "-$(sid "$d")" 2>/dev/null
 	}
 	within 10 free "$port" || fail "port $port still listening"
-	# shellcheck disable=SC2012 # The names are known and plain.
 	got=$(ls -A "$dir" | tr '\n' ' ')
-	[ "$got" = "$* " ] || fail "want only $* in the directory, got: $got"
+	[ "$got" = "secret " ] || fail "want only secret in the directory, got: $got"
+	unchanged "$d" "the working directory changed"
+	[ ! -e "$work/Caddyfile" ] || cmp -s "$work/Caddyfile" /src/Caddyfile.example || fail "the Caddyfile changed"
 }
 
 # short TICKET succeeds when TICKET is the short form: the endpoint ID and
@@ -152,25 +164,17 @@ base=$(listening tcp; listening udp)
 dir=$T/a
 export DUMBTUNNEL_DIR="$dir"
 
+usage() {
+	[ "$(status "$c")" = 2 ] || fail "want exit status 2, got $(status "$c")"
+	grep -q 'usage: dumbtunnel' "$c/err" || fail "stderr has no usage line"
+	[ ! -s "$c/out" ] || fail "wrote to stdout"
+}
 start "no arguments and no Caddyfile"
 run finish
-[ "$(status "$c")" = 2 ] || fail "want exit status 2, got $(status "$c")"
-grep -q 'usage: dumbtunnel' "$c/err" || fail "stderr has no usage line"
-[ ! -s "$c/out" ] || fail "wrote to stdout"
-
-start "routes without DUMBTUNNEL_DOMAIN"
-run finish 3000
-[ "$(status "$c")" != 0 ] || fail "want a nonzero exit status"
-grep -q DUMBTUNNEL_DOMAIN "$c/err" || fail "stderr does not name DUMBTUNNEL_DOMAIN"
-[ ! -e "$dir/Caddyfile" ] || fail "wrote a Caddyfile"
-[ ! -s "$c/out" ] || fail "wrote to stdout"
-
-start "routes with an empty DUMBTUNNEL_DOMAIN"
-export DUMBTUNNEL_DOMAIN=
-run finish 3000
-unset DUMBTUNNEL_DOMAIN
-[ "$(status "$c")" != 0 ] || fail "want a nonzero exit status"
-[ ! -e "$dir/Caddyfile" ] || fail "wrote a Caddyfile"
+usage
+start "a Caddyfile that does not exist"
+run finish "$T/missing"
+usage
 
 start "ticket in a new directory"
 rm -rf "$dir"
@@ -182,7 +186,7 @@ short "$first" || fail "not a short ticket: $first"
 [ "$(grep -cxE '[0-9a-f]{64}' "$dir/secret")" = 1 ] && [ "$(grep -c '' "$dir/secret")" = 1 ] ||
 	fail "secret is not 64 lowercase hex digits"
 [ "$(stat -c %a "$dir/secret")" = 600 ] || fail "secret has mode $(stat -c %a "$dir/secret"), want 600"
-after "$c" 8443 secret
+after "$c" 8443
 cp "$dir/secret" "$T/secret"
 
 start "ticket again"
@@ -216,38 +220,12 @@ run finish ticket
 unset XDG_CONFIG_HOME
 export DUMBTUNNEL_DIR="$dir"
 
-routes='https://example.test -> localhost:3000
-https://api.example.test -> localhost:3001
-https://db.example.test -> otherhost:5432'
-
-serving() {
-	ready "$1" || return
-	within 20 accepts "$2" || fail "nothing accepts on 127.0.0.1:$2"
-	within 20 contacted "$1/ca" || fail "Caddy did not contact DUMBTUNNEL_ACME_CA"
-	t=$(ticket_of "$1")
-	short "$t" || fail "not a short ticket: $t"
-	[ "$(key "$t")" = "$(key "$first")" ] || fail "the endpoint ID changed"
-	[ "$(grep -c '^ticket: ' "$1/out")" = 1 ] || fail "want one ticket line on stdout"
-	[ "$(grep -v '^ticket: ' "$1/out")" = "$3" ] || fail "want only these route lines besides the ticket: $3"
-	[ "$(listening udp | grep -cx "$2")" = 0 ] || fail "listens on UDP port $2, so HTTP/3 is on"
-	[ "$(listening tcp | grep -vx "$caport" | tr '\n' ' ')" = "$2 " ] ||
-		fail "want only TCP port $2 listening, got: $(listening tcp | tr '\n' ' ')"
-}
-
-s1() { serving "$1" 8443 "$routes"; stop "$1" TERM; }
-start "three routes, then SIGTERM"
-export DUMBTUNNEL_DOMAIN=example.test
-run s1 3000 api=3001 db=otherhost:5432
-stopped "$c"
-after "$c" 8443 Caddyfile secret
-cp "$dir/Caddyfile" "$T/Caddyfile"
-
-# Caddy reads the CA and the port from the environment, so the Caddyfile
-# itself must name Let's Encrypt and port 8443 when they are unset.
-start "the Caddyfile"
+# Caddyfile.example must work as shipped. Caddy reads the CA and the port
+# from the environment, so with both unset it must name Let's Encrypt.
+start "Caddyfile.example"
 (
 	unset DUMBTUNNEL_ACME_CA DUMBTUNNEL_PORT
-	caddy adapt --config "$dir/Caddyfile" --adapter caddyfile 2>/dev/null
+	caddy adapt --config /src/Caddyfile.example --adapter caddyfile 2>/dev/null
 ) >"$c/json" || fail "caddy adapt failed"
 count() { grep -o "$1" "$c/json" | grep -c .; }
 issuers=$(count '"issuers":')
@@ -257,29 +235,43 @@ issuers=$(count '"issuers":')
 [ "$(count '"http":{"disabled":true}')" = "$issuers" ] || fail "the HTTP challenge is on"
 ! grep -qE '"module":"(zerossl|internal)"' "$c/json" || fail "has another issuer"
 sed 's/"match":/\n&/g' "$c/json" >"$c/routes"
-for r in example.test:localhost:3000 api.example.test:localhost:3001 db.example.test:otherhost:5432; do
-	host=${r%%:*} dial=${r#*:}
-	grep -F "\"host\":[\"$host\"]" "$c/routes" | grep -qF "\"dial\":\"$dial\"" || fail "no route from $host to $dial"
-done
+grep -F '"host":["api.you.duckdns.org"]' "$c/routes" | grep -qF '"dial":"localhost:3000"' ||
+	fail "no site api.you.duckdns.org that proxies to localhost:3000"
+cp /src/Caddyfile.example "$work/Caddyfile"
 
-start "ticket leaves the Caddyfile alone"
-run finish ticket
-cmp -s "$dir/Caddyfile" "$T/Caddyfile" || fail "the Caddyfile changed"
-
-s2() {
-	serving "$1" 9443 ""
-	free 8443 || fail "listens on 8443"
-	stop "$1" INT group
+# serving DIR PORT checks a running dumbtunnel. stdout holds only the ticket
+# line, and Caddy listens on TCP port PORT and nowhere else.
+serving() {
+	ready "$1" || return
+	unchanged "$1" "wrote to the working directory while running"
+	within 20 accepts "$2" || fail "nothing accepts on 127.0.0.1:$2"
+	within 20 contacted "$1/ca" || fail "Caddy did not contact DUMBTUNNEL_ACME_CA"
+	t=$(ticket_of "$1")
+	short "$t" || fail "not a short ticket: $t"
+	[ "$(key "$t")" = "$(key "$first")" ] || fail "the endpoint ID changed"
+	[ "$(grep -c '' "$1/out")" = 1 ] || fail "want only the ticket line on stdout"
+	[ "$(listening udp | grep -cx "$2")" = 0 ] || fail "listens on UDP port $2, so HTTP/3 is on"
+	[ "$(listening tcp | grep -vx "$caport" | tr '\n' ' ')" = "$2 " ] ||
+		fail "want only TCP port $2 listening, got: $(listening tcp | tr '\n' ' ')"
 }
-start "no arguments, DUMBTUNNEL_PORT=9443, then SIGINT to the group"
-unset DUMBTUNNEL_DOMAIN
-export DUMBTUNNEL_PORT=9443
-run s2
-stopped "$c"
-after "$c" 9443 Caddyfile secret
-cmp -s "$dir/Caddyfile" "$T/Caddyfile" || fail "the Caddyfile changed"
 
-# dumbpipe forwards to 127.0.0.1:DUMBTUNNEL_PORT, whatever the Caddyfile says.
+s1() { serving "$1" 8443; stop "$1" TERM; }
+start "./Caddyfile, then SIGTERM"
+run s1
+stopped "$c"
+after "$c" 8443
+
+# A Caddyfile by any name, relative to the working directory.
+s2() { serving "$1" 9443; stop "$1" INT group; }
+start "../tunnel.conf, DUMBTUNNEL_PORT=9443, then SIGINT to the group"
+cp /src/Caddyfile.example "$T/tunnel.conf"
+export DUMBTUNNEL_PORT=9443
+run s2 ../tunnel.conf
+stopped "$c"
+after "$c" 9443
+
+# dumbpipe forwards to 127.0.0.1:DUMBTUNNEL_PORT, and Caddy serves the
+# Caddyfile given, not ./Caddyfile.
 custom() {
 	curl -sS --max-time 5 http://127.0.0.1:7001/ >"$c/got" 2>&1 &&
 		[ "$(cat "$c/got")" = "custom Caddyfile on 9444" ]
@@ -294,9 +286,9 @@ s3() {
 	pkill -f 'connect-tcp --addr 127.0.0.1:7001'
 	stop "$1" HUP group
 }
-start "an edited Caddyfile, then SIGHUP to the group"
+start "a custom Caddyfile, then SIGHUP to the group"
 export DUMBTUNNEL_PORT=9444
-cat >"$dir/Caddyfile" <<'EOF'
+cat >"$T/custom" <<'EOF'
 {
 	admin off
 }
@@ -306,33 +298,28 @@ http://:9444 {
 	respond "custom Caddyfile on 9444"
 }
 EOF
-cp "$dir/Caddyfile" "$T/custom"
-run s3
+run s3 "$T/custom"
 stopped "$c"
-after "$c" 9444 Caddyfile secret
-cmp -s "$dir/Caddyfile" "$T/custom" || fail "the Caddyfile changed"
+after "$c" 9444
 unset DUMBTUNNEL_PORT
 
-s4() { serving "$1" 8443 "https://api.example.test -> localhost:3001"; stop "$1" HUP; }
-start "routes replace the edited Caddyfile, then SIGHUP"
-export DUMBTUNNEL_DOMAIN=example.test
-run s4 api=3001
+s4() { serving "$1" 8443; stop "$1" HUP; }
+start "./Caddyfile, then SIGHUP"
+run s4
 stopped "$c"
-after "$c" 8443 Caddyfile secret
-! grep -q 'custom Caddyfile' "$dir/Caddyfile" || fail "the routes did not replace the Caddyfile"
-unset DUMBTUNNEL_DOMAIN
+after "$c" 8443
 
-s5() { serving "$1" 8443 ""; stop "$1" INT; }
-start "no arguments, then SIGINT"
+s5() { serving "$1" 8443; stop "$1" INT; }
+start "./Caddyfile, then SIGINT"
 run s5
 stopped "$c"
-after "$c" 8443 Caddyfile secret
+after "$c" 8443
 
-s6() { serving "$1" 8443 ""; stop "$1" TERM group; }
-start "no arguments, then SIGTERM to the group"
+s6() { serving "$1" 8443; stop "$1" TERM group; }
+start "./Caddyfile, then SIGTERM to the group"
 run s6
 stopped "$c"
-after "$c" 8443 Caddyfile secret
+after "$c" 8443
 
 # A dumbpipe that fails at once. dumbtunnel must say why, print no ticket,
 # start no Caddy and exit.
@@ -347,7 +334,7 @@ broken() {
 	[ "$(status "$c")" != 0 ] || fail "exit status 0 when dumbpipe fails"
 	[ ! -s "$c/out" ] || fail "wrote to stdout: $(cat "$c/out")"
 	grep -q 'dumbpipe stand-in failed' "$c/err" || fail "stderr does not show dumbpipe's error"
-	after "$c" 8443 Caddyfile secret
+	after "$c" 8443
 }
 start "dumbpipe fails in ticket mode"
 broken ticket
@@ -355,10 +342,10 @@ start "dumbpipe fails while serving"
 broken
 
 start "a broken Caddyfile"
-echo 'this is { not a Caddyfile' >"$dir/Caddyfile"
-run finish
+echo 'this is { not a Caddyfile' >"$T/broken"
+run finish "$T/broken"
 stopped "$c"
-after "$c" 8443 Caddyfile secret
+after "$c" 8443
 
 if [ -s "$fails" ]; then
 	echo "cli: $(wc -l <"$fails") checks failed"

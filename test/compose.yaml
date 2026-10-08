@@ -1,9 +1,10 @@
 # The end-to-end test. Run it with test/run.sh, which sets TICKET.
 #
-# The laptop serves api.example.test from a local port. The relay forwards
-# its port 443 to the laptop over iroh. Pebble issues the certificate with a
-# TLS-ALPN-01 challenge sent through the relay. The client then fetches the
-# page through the relay, and again straight over iroh.
+# The laptop runs dumbtunnel with Caddyfile.example in its working directory,
+# with the domain changed so that it proxies api.example.test to a local port.
+# The relay forwards its port 443 to the laptop over iroh. Pebble issues the
+# certificate with a TLS-ALPN-01 challenge sent through the relay. The client
+# then fetches the page through the relay, and again straight over iroh.
 name: ${COMPOSE_PROJECT_NAME:-dumbtunnel-test}
 
 x-test: &test
@@ -23,14 +24,14 @@ services:
   laptop:
     <<: *test
     user: laptop
+    working_dir: /home/laptop
     environment:
-      DUMBTUNNEL_DOMAIN: example.test
       DUMBTUNNEL_ACME_CA: https://pebble:14000/dir
       SSL_CERT_FILE: /etc/pebble.minica.pem
       RUST_LOG: ${RUST_LOG:-warn}
     volumes:
       - laptop:/home/laptop/.config/dumbtunnel
-    command: dumbtunnel api=3000
+    command: dumbtunnel
     # In real use the relay is up first. Here, without the wait, the first
     # challenge can reach the relay before it listens, and Caddy retries a
     # minute later.

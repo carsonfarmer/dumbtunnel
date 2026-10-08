@@ -5,8 +5,9 @@ what the project does and how to use it.
 
 ## The project
 
-Two shell scripts that serve local ports at public HTTPS names through a relay that
-sees only encrypted bytes. Nearly all the work is done by
+Two shell scripts and an example Caddyfile that serve a laptop's sites at public
+HTTPS names through a relay that sees only encrypted bytes. Nearly all the work is
+done by
 [dumbpipe](https://github.com/n0-computer/dumbpipe), which moves bytes over iroh, and
 [Caddy](https://caddyserver.com), which handles TLS, certificates and routing. This
 repository holds the glue.
@@ -14,6 +15,7 @@ repository holds the glue.
 | Where | What it is |
 | --- | --- |
 | `dumbtunnel` | The laptop side. It starts dumbpipe and Caddy. |
+| `Caddyfile.example` | The user's starting point. Its global block makes Caddy work through the relay. |
 | `install.sh` | The relay side. It installs dumbpipe and a systemd service. |
 | `test/` | The end-to-end test, in Docker, with Pebble as the CA. |
 | `.github/` | CI for the test, shellcheck and the size budget, and the Dependabot config. |
@@ -52,8 +54,11 @@ skill to interview the user before you write code.
   not guess them from memory.
 - **Treat the interface as a contract.** Users depend on the command line, the
   environment variables, the stdout of `dumbtunnel` and `dumbtunnel ticket`, the
-  file names in `DUMBTUNNEL_DIR`, and the `dumbtunnel` systemd unit. They change only
-  when the user asks.
+  file names in `DUMBTUNNEL_DIR`, the global block in `Caddyfile.example`, and the
+  `dumbtunnel` systemd unit. They change only when the user asks.
+- **Leave Caddy config to the user.** dumbtunnel passes the user's Caddyfile to
+  Caddy and never writes or checks it. A setting every user needs belongs in the
+  global block of `Caddyfile.example`.
 - **Keep versions in one place.** The dumbpipe version lives in `install.sh`, image
   versions in `test/Dockerfile`, and action versions in the workflow files. Do not
   repeat them in docs, comments or tests.

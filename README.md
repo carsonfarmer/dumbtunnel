@@ -1,21 +1,29 @@
 # dumbtunnel
 
-dumbtunnel serves ports on your laptop at public HTTPS addresses. Traffic comes in
-through a small server you run, such as a free cloud VM. That server only forwards
-encrypted bytes. The certificates and their keys stay on your laptop, so the server
-cannot read or change what passes through it.
+dumbtunnel is `caddy run`, reachable from the internet through a server that can't
+read your traffic. Copy `Caddyfile.example` to `Caddyfile`, put your sites at the
+end, and run `dumbtunnel` next to it:
+
+```caddyfile
+api.you.duckdns.org {
+	reverse_proxy localhost:3000
+}
+```
 
 ```console
-$ dumbtunnel api=3000 web=5173
-https://api.you.duckdns.org -> localhost:3000
-https://web.you.duckdns.org -> localhost:5173
+$ dumbtunnel
 ticket: endpointaa...
 ```
+
+Now `https://api.you.duckdns.org` reaches `localhost:3000`. Traffic comes in through
+a small server you run, such as a free cloud VM. That server only forwards encrypted
+bytes. The certificates and their keys stay on your laptop, so the server cannot read
+or change what passes through it.
 
 There is very little here of its own. [dumbpipe](https://github.com/n0-computer/dumbpipe)
 moves the bytes over [iroh](https://github.com/n0-computer/iroh), and
 [Caddy](https://caddyserver.com) handles TLS, certificates and routing. dumbtunnel is
-a shell script that starts both, and `install.sh` sets up the server.
+a short shell script that starts both, and `install.sh` sets up the server.
 
 ## How it works
 
@@ -29,7 +37,8 @@ browser ──TLS──▶ relay :443 ──iroh──▶ dumbpipe ──▶ Cad
   which accepts TCP connections on port 443 and sends each one over iroh to your
   laptop. It does not hold a certificate and never decrypts anything.
 - **Your laptop** runs `dumbpipe listen-tcp`, which hands each connection to Caddy.
-  Caddy ends TLS and sends the request to a local port, chosen by hostname.
+  Caddy ends TLS and handles the request as your Caddyfile says, such as by
+  passing it to a local port.
 - **Certificates** come from Let's Encrypt. Caddy answers the TLS-ALPN-01 challenge,
   which arrives on port 443 through the relay like any other connection. You need no
   port 80 and no DNS API token.
@@ -101,9 +110,12 @@ records for `example.com` and `*.example.com`.
 
 ### 4. Run it
 
+Copy the example Caddyfile, and in the copy change `api.you.duckdns.org` to a name
+under yours. Keep the block at the top. Then run dumbtunnel in the same directory:
+
 ```bash
-export DUMBTUNNEL_DOMAIN=you.duckdns.org
-dumbtunnel api=3000
+cp Caddyfile.example Caddyfile
+dumbtunnel
 ```
 
 The first request to a new name waits a few seconds while Caddy gets its
@@ -112,29 +124,30 @@ certificate.
 ## Usage
 
 ```text
-dumbtunnel PORT                serve https://$DUMBTUNNEL_DOMAIN from localhost:PORT
-dumbtunnel NAME=PORT...        serve https://NAME.$DUMBTUNNEL_DOMAIN from localhost:PORT
-dumbtunnel NAME=HOST:PORT...   proxy to another address
-dumbtunnel                     serve the same routes as last time
-dumbtunnel ticket              print the ticket and exit
+dumbtunnel              serve the sites in ./Caddyfile
+dumbtunnel CADDYFILE    serve the sites in another Caddyfile
+dumbtunnel ticket       print the ticket and exit
 ```
 
 dumbtunnel also prints the ticket when it starts. Do not run `dumbtunnel ticket`
 while dumbtunnel runs, because two copies of one key fight over its connection.
 
+The Caddyfile is an ordinary one, so anything in
+[Caddy's docs](https://caddyserver.com/docs/caddyfile) works: more sites,
+`file_server`, `basic_auth`, headers. The block at the top of the example is what
+makes it work through the relay. It serves HTTPS on `DUMBTUNNEL_PORT`, where dumbpipe
+forwards, and turns off what cannot pass through the relay: port 80, HTTP/3 and the
+HTTP challenge. Keep it.
+
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `DUMBTUNNEL_DOMAIN` | none | The name that routes go under. Needed to set routes. |
-| `DUMBTUNNEL_DIR` | `~/.config/dumbtunnel` | Where the key and the Caddyfile live. |
-| `DUMBTUNNEL_ACME_CA` | Let's Encrypt | The ACME directory URL that Caddy gets certificates from. |
-| `DUMBTUNNEL_PORT` | `8443` | The laptop port where Caddy listens and dumbpipe forwards. |
+| `DUMBTUNNEL_DIR` | `~/.config/dumbtunnel` | Where the key lives. |
+| `DUMBTUNNEL_PORT` | `8443` | The laptop port where dumbpipe forwards and the example Caddyfile listens. |
+| `DUMBTUNNEL_ACME_CA` | Let's Encrypt | The ACME directory URL that the example Caddyfile gets certificates from. |
 
 To try a setup without using up Let's Encrypt's rate limits, set
 `DUMBTUNNEL_ACME_CA` to `https://acme-staging-v02.api.letsencrypt.org/directory`.
 Browsers do not trust staging certificates.
-
-To change more, such as adding `basic_auth`, edit `Caddyfile` in `DUMBTUNNEL_DIR`
-and run `dumbtunnel` with no arguments. Setting new routes overwrites it.
 
 ## Reaching the laptop without the relay
 
@@ -157,8 +170,8 @@ If you only want private access, you do not need dumbtunnel at all. Run
 
 - **The relay sees** client IP addresses, the hostnames in TLS handshakes, and the
   size and timing of traffic. It cannot read or change requests and responses.
-- **Every route is public.** Anyone who knows the name can reach your local service.
-  Protect it in the app or with `basic_auth` in the Caddyfile.
+- **Every site is public.** Anyone who knows the name can reach it. Protect it in
+  the app or with `basic_auth` in the Caddyfile.
 - **Names are public too.** Let's Encrypt logs every certificate it issues in public
   Certificate Transparency logs, so each name you serve is listed there.
 - **Whoever controls the name or the relay** can get their own certificate for your

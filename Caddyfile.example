@@ -1,0 +1,28 @@
+# Copy this file to Caddyfile, change the sites at the end to your own, and
+# run dumbtunnel in the same directory. Every site here is public.
+#
+# Keep this first block. Caddy serves HTTPS on DUMBTUNNEL_PORT, where
+# dumbpipe forwards. The relay carries only TCP port 443, so the block turns
+# off what cannot pass through it: port 80, HTTP/3 and the HTTP challenge.
+{
+	admin off
+	https_port {$DUMBTUNNEL_PORT:8443}
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+	cert_issuer acme {$DUMBTUNNEL_ACME_CA:https://acme-v02.api.letsencrypt.org/directory} {
+		disable_http_challenge
+	}
+}
+
+api.you.duckdns.org {
+	reverse_proxy localhost:3000
+}
+
+# Any Caddy site works, such as a folder of files:
+#
+# files.you.duckdns.org {
+# 	root * /path/to/folder
+# 	file_server
+# }

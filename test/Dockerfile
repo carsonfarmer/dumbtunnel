@@ -12,4 +12,8 @@ RUN sh /tmp/install.sh
 COPY --from=caddy /usr/bin/caddy /usr/local/bin/
 COPY --from=pebble /test/certs/pebble.minica.pem /etc/
 COPY dumbtunnel /usr/local/bin/
-RUN adduser -D laptop && mkdir -p /home/laptop/.config/dumbtunnel && chown -R laptop /home/laptop
+# The laptop serves Caddyfile.example, with the test's domain.
+COPY Caddyfile.example /tmp/
+RUN adduser -D laptop && mkdir -p /home/laptop/.config/dumbtunnel && \
+	sed 's/you\.duckdns\.org/example.test/g' /tmp/Caddyfile.example >/home/laptop/Caddyfile && \
+	chown -R laptop /home/laptop
