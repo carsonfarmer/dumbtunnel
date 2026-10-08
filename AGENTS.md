@@ -26,8 +26,11 @@ RUST_LOG='warn,iroh=debug' test/run.sh       # the same, with iroh's debug logs
 docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable dumbtunnel install.sh test/*.sh
 ```
 
-Run shellcheck and the end-to-end test before you call a change done. Everything
-runs in Docker. Do not install dumbpipe or Caddy on the host to test.
+Run shellcheck and the end-to-end test before you call a change done. The test runs
+in Docker. To try the laptop side on the host, set `DUMBTUNNEL_DIR` and
+`XDG_DATA_HOME` to scratch directories, so the run touches neither the real key nor
+Caddy's data. On macOS, Go ignores `SSL_CERT_FILE`, so to use the test's Pebble, add
+`trusted_roots` to the `cert_issuer` block.
 
 ## Plan before you build
 
