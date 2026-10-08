@@ -48,7 +48,7 @@ esac
 rm -f "$dir/fifo" && mkfifo "$dir/fifo"
 IROH_SECRET=$(cat "$dir/secret") dumbpipe listen-tcp -v --host "127.0.0.1:${DUMBTUNNEL_PORT:-8443}" >&2 2>"$dir/fifo" &
 pid=$!
-trap 'kill $pid 2>/dev/null; rm -f "$dir/fifo"' EXIT
+trap 'rm -f "$dir/fifo"; kill $pid 2>/dev/null || :' EXIT
 trap 'exit 130' INT TERM
 
 # Once online, dumbpipe prints a short ticket: the laptop's ID and its iroh
