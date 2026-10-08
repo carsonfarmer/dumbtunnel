@@ -27,6 +27,9 @@ The replaceable part is `dumbtunnel` (24 lines of code), `install.sh` (32) and
 `Caddyfile.example`. `install.sh` repeats the dumbpipe version from `SPEC.md`, and
 `relay.sh` checks that the two agree.
 
+`dumbertunnel`, the one-site helper, is outside all of this. The spec does not
+describe it, the suite does not run it, and a rebuild leaves it as it is.
+
 ## How fast each part changes
 
 The pattern book asks for named pace layers: how often each layer may change, so that

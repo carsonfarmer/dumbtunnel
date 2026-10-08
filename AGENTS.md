@@ -15,6 +15,7 @@ repository holds the glue.
 | Where | What it is |
 | --- | --- |
 | `dumbtunnel` | The laptop side. It starts dumbpipe and Caddy. |
+| `dumbertunnel` | A helper for one site. It writes a Caddyfile and runs `dumbtunnel` on it. It is outside the spec and the suite. |
 | `Caddyfile.example` | The user's starting point. Its global block makes Caddy work through the relay. |
 | `install.sh` | The relay side. It installs dumbpipe and a systemd service. |
 | `.regenerate/` | The spec, the decisions, the rebuild prompt and the spec suite. See its [README](.regenerate/README.md). |
@@ -28,10 +29,11 @@ repository holds the glue.
 .regenerate/check.sh                         # the spec suite, needs Docker and the network
 .regenerate/check.sh static cli              # only these steps: static, cli, relay, e2e
 RUST_LOG='warn,iroh=debug' test/run.sh       # the end-to-end test, with iroh's debug logs
-docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable test/*.sh .regenerate/*.sh
+docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable test/*.sh .regenerate/*.sh dumbertunnel
 ```
 
-Run the spec suite and shellcheck on the test scripts before you call a change done.
+Run the spec suite, and shellcheck on the test scripts and `dumbertunnel`, before you
+call a change done.
 Everything but `static` runs in Docker. To try the laptop side on the host, set `DUMBTUNNEL_DIR` and
 `XDG_DATA_HOME` to scratch directories, so the run touches neither the real key nor
 Caddy's data. On macOS, Go ignores `SSL_CERT_FILE`, so to use the test's Pebble, add
@@ -63,6 +65,11 @@ skill to interview the user before you write code.
 - **Leave Caddy config to the user.** dumbtunnel passes the user's Caddyfile to
   Caddy and never writes or checks it. A setting every user needs belongs in the
   global block of `Caddyfile.example`.
+- **Keep `dumbertunnel` outside the contract.** It is a helper. The spec, the
+  decisions, the spec suite and the size budget do not cover it, and a rebuild
+  leaves it alone. Its global block is a copy of the one in `Caddyfile.example`, so
+  change the two together. CI only runs shellcheck on it, so try a change to it by
+  hand, in Docker.
 - **Keep versions in one place.** The dumbpipe release is named in section 2 of
   `.regenerate/SPEC.md` and in `install.sh`, and the spec suite checks that they
   agree. Image versions live in `test/Dockerfile`, and action versions in the

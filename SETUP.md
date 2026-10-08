@@ -232,6 +232,10 @@ Tell the person:
   stays the same, so the relay keeps working across restarts.
 - More sites go in the Caddyfile, as more blocks with names under theirs. Restart
   dumbtunnel to pick them up.
+- For a quick site on its own, `dumbertunnel NAME PORT` or `dumbertunnel NAME DIR`
+  skips the Caddyfile. It is in the repository, and goes next to `dumbtunnel` with
+  `install -m 755 dumbertunnel ~/.local/bin/`. The README's section "One site
+  without a Caddyfile" has the details.
 - Every site is public. To limit one to people with a password, add `basic_auth`
   to its block. `caddy hash-password` makes the hash, and the person types the
   password themselves.

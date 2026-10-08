@@ -1,0 +1,45 @@
+#!/bin/sh
+# dumbertunnel serves one site without a Caddyfile: a local port, or a folder of
+# files, at one public name. It writes a Caddyfile and runs dumbtunnel on it.
+# For more than one site, or any other Caddy setting, write a Caddyfile and run
+# dumbtunnel. dumbertunnel is a helper, outside the spec and the spec suite. See
+# README.md.
+set -eu
+
+usage() {
+	echo "usage: dumbertunnel NAME [PORT | DIR]" >&2
+	exit 2
+}
+[ $# -ge 1 ] && [ $# -le 2 ] || usage
+case $1 in *.*) ;; *) usage ;; esac
+target=${2:-3000}
+case $target in
+*[!0-9]*)
+	[ -d "$target" ] || usage
+	root=$(CDPATH='' cd -- "$target" && pwd)
+	# Paths with a dot file or folder in them, such as .git or .env, get a 404.
+	site=$(printf 'root * "%s"\n\t@dot path */.*\n\trespond @dot 404\n\tfile_server browse' "$root")
+	;;
+*) site="reverse_proxy localhost:$target" ;;
+esac
+
+dir=${DUMBTUNNEL_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/dumbtunnel}
+mkdir -p "$dir"
+# The global block is the one in Caddyfile.example. Change the two together.
+cat >"$dir/dumbertunnel.Caddyfile" <<'EOF'
+# Written by dumbertunnel, and replaced on every run. To change it, copy it and
+# run dumbtunnel on the copy.
+{
+	admin off
+	https_port {$DUMBTUNNEL_PORT:8443}
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+	cert_issuer acme {$DUMBTUNNEL_ACME_CA:https://acme-v02.api.letsencrypt.org/directory} {
+		disable_http_challenge
+	}
+}
+EOF
+printf '\n%s {\n\t%s\n}\n' "$1" "$site" >>"$dir/dumbertunnel.Caddyfile"
+exec dumbtunnel "$dir/dumbertunnel.Caddyfile"

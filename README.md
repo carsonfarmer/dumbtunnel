@@ -67,8 +67,9 @@ On macOS:
 brew install caddy dumbpipe
 ```
 
-Then put the `dumbtunnel` script somewhere on your `PATH`. On Linux, install Caddy
-from your package manager, and `sudo sh install.sh` installs dumbpipe.
+Then put the `dumbtunnel` script somewhere on your `PATH`. Put `dumbertunnel` next
+to it if you want the [one-site helper](#one-site-without-a-caddyfile). On Linux,
+install Caddy from your package manager, and `sudo sh install.sh` installs dumbpipe.
 
 Print your ticket:
 
@@ -123,7 +124,8 @@ dumbtunnel
 ```
 
 The first request to a new name waits a few seconds while Caddy gets its
-certificate.
+certificate. For one site, `dumbertunnel api.you.duckdns.org 3000` skips the
+Caddyfile. See [One site without a Caddyfile](#one-site-without-a-caddyfile).
 
 ## Usage
 
@@ -152,6 +154,28 @@ HTTP challenge. Keep it.
 To try a setup without using up Let's Encrypt's rate limits, set
 `DUMBTUNNEL_ACME_CA` to `https://acme-staging-v02.api.letsencrypt.org/directory`.
 Browsers do not trust staging certificates.
+
+## One site without a Caddyfile
+
+`dumbertunnel` is a helper for one site. It writes the Caddyfile and runs
+`dumbtunnel` on it, so it needs `dumbtunnel` on your `PATH`.
+
+```text
+dumbertunnel NAME         serve localhost:3000 at https://NAME
+dumbertunnel NAME PORT    serve localhost:PORT at https://NAME
+dumbertunnel NAME DIR     serve the files in DIR at https://NAME
+```
+
+- A folder gets a listing of its files. A path with a dot file or folder in it,
+  such as `.git` or `.env`, gets a 404, but the listing still shows the name.
+- The Caddyfile is `dumbertunnel.Caddyfile` in `DUMBTUNNEL_DIR`, and each run
+  replaces it. To add a site or change a setting, copy it and run `dumbtunnel` on
+  the copy.
+- The variables above work the same way. For example,
+  `DUMBTUNNEL_ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory dumbertunnel api.you.duckdns.org`
+  tries a name on staging.
+- It is a convenience. The spec does not describe it, and the spec suite does not
+  test it.
 
 ## Reaching the laptop without the relay
 
