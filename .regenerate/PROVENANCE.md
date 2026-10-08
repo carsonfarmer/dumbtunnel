@@ -59,9 +59,33 @@ Fill in a row after each check of a rebuild with `check.sh`.
 
 | Date | Mode | Model and harness | Inputs | Result | Spec gaps found | Spec changes |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-08 | blind | Claude Sonnet 5.5 (`claude-sonnet-5-5`), as a subagent of Claude Code 2.1.293 in the desktop app. See the notes below. | Reference `4b2ce8d`. Spec, decisions and prompt at `4b2ce8d`. | All four steps passed on the first run: static, cli, relay and e2e. `dumbtunnel` 33 lines of code, `install.sh` 35. The budget was 60 and 40 then. `dumbtunnel` also fits the budget of 40 from `9e52a61`. | None failed. The agent named choices the spec leaves open. See the notes below. | None |
 
 - **Mode** is `blind` or `guided`, as [`README.md`](README.md) defines them.
 - **Inputs** names the commit exported as the reference and the commit of `SPEC.md`,
   `DECISIONS.md` and `PROMPT.md` that the run used.
 - **Result** says whether each step of `check.sh` passed, names the checks that
   failed, and gives the line counts that the `static` step prints.
+
+### Notes on the runs
+
+**2026-10-08, blind.**
+
+- The prompt was the text of `PROMPT.md`, plus rules from the harness: work only in
+  the workspace, test only in Docker under names that start with `regen-`, bind no
+  host ports, and read no other copy of dumbtunnel.
+- The workspace sat next to the exported reference in one scratch directory. None
+  of the agent's 92 tool calls read outside its workspace. It saw the names of the
+  suite's `dumbtunnel-*` images in a `docker` listing and did not open them.
+- It tested with public images: Alpine, Debian, Caddy and Pebble.
+- Choices it made where the spec is open:
+  - It stops Caddy with SIGQUIT, because SIGTERM makes Caddy wait for open
+    connections.
+  - The FIFO is `fifo.PID` in the key directory.
+  - A Caddyfile named `ticket` has to be given as `./ticket`.
+  - dumbpipe's stdout goes to stderr.
+  - The secret is 32 random bytes in hex.
+  - `install.sh` puts the iptables rule before the first REJECT rule and adds it
+    only once.
+  - It downloads with curl, or with wget when curl is missing.
+- None of these failed a check, so the spec did not change.
