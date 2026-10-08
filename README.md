@@ -72,10 +72,14 @@ works, but its free tier includes only 1 GB of outbound traffic a month.
 
 On Oracle:
 
-1. Create a compute instance with an Ubuntu image and the `VM.Standard.E2.1.Micro`
-   shape. Add your SSH key.
-2. In the instance's subnet, open the default security list and add an ingress rule
-   for TCP port 443 from `0.0.0.0/0`.
+1. Create the network first. Under **Networking > Virtual cloud networks**, start
+   the VCN wizard and choose **Create VCN with Internet Connectivity**. Then open
+   its public subnet's default security list and add an ingress rule for TCP port
+   443 from `0.0.0.0/0`.
+2. Create a compute instance with an Ubuntu image and the `VM.Standard.E2.1.Micro`
+   shape. If that shape is out of capacity, `VM.Standard.A1.Flex` is also free.
+   Under networking, select the new network and its public subnet, and turn on
+   **Automatically assign public IPv4 address**. Add your SSH key.
 3. From your laptop, run `install.sh` on the VM with your ticket:
 
    ```bash
