@@ -17,19 +17,21 @@ repository holds the glue.
 | `dumbtunnel` | The laptop side. It starts dumbpipe and Caddy. |
 | `Caddyfile.example` | The user's starting point. Its global block makes Caddy work through the relay. |
 | `install.sh` | The relay side. It installs dumbpipe and a systemd service. |
-| `test/` | The end-to-end test, in Docker, with Pebble as the CA. |
-| `.github/` | CI for the test, shellcheck and the size budget, and the Dependabot config. |
+| `.regenerate/` | The spec, the decisions, the rebuild prompt and the spec suite. See its [README](.regenerate/README.md). |
+| `test/` | The end-to-end test, in Docker, with Pebble as the CA. The spec suite runs it. |
+| `.github/` | CI for the spec suite, and the Dependabot config. |
 
 ## Commands
 
 ```bash
-test/run.sh                                  # the end-to-end test, needs the network
-RUST_LOG='warn,iroh=debug' test/run.sh       # the same, with iroh's debug logs
-docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable dumbtunnel install.sh test/*.sh
+.regenerate/check.sh                         # the spec suite, needs Docker and the network
+.regenerate/check.sh static cli              # only these steps: static, cli, relay, e2e
+RUST_LOG='warn,iroh=debug' test/run.sh       # the end-to-end test, with iroh's debug logs
+docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable test/*.sh .regenerate/*.sh
 ```
 
-Run shellcheck and the end-to-end test before you call a change done. The test runs
-in Docker. To try the laptop side on the host, set `DUMBTUNNEL_DIR` and
+Run the spec suite and shellcheck on the test scripts before you call a change done.
+Everything but `static` runs in Docker. To try the laptop side on the host, set `DUMBTUNNEL_DIR` and
 `XDG_DATA_HOME` to scratch directories, so the run touches neither the real key nor
 Caddy's data. On macOS, Go ignores `SSL_CERT_FILE`, so to use the test's Pebble, add
 `trusted_roots` to the `cert_issuer` block.
@@ -42,9 +44,9 @@ skill to interview the user before you write code.
 
 ## Rules
 
-- **Stay inside the size budget.** `dumbtunnel` stays under 60 lines of code and
-  `install.sh` under 40, counting lines that are neither blank nor comments. CI fails
-  when one goes over. When code grows, look in dumbpipe or Caddy for something that
+- **Stay inside the size budget.** `dumbtunnel` has at most 60 lines of code and
+  `install.sh` at most 40, counting lines that are neither blank nor comments. CI
+  fails when one goes over. When code grows, look in dumbpipe or Caddy for something that
   already does the job.
 - **Stay POSIX.** The scripts run under `/bin/sh` on macOS and on busybox. Do not
   use bash features or GNU-only flags. busybox `sed` reads ahead, so do not use it
@@ -55,25 +57,30 @@ skill to interview the user before you write code.
 - **Treat the interface as a contract.** Users depend on the command line, the
   environment variables, the stdout of `dumbtunnel` and `dumbtunnel ticket`, the
   file names in `DUMBTUNNEL_DIR`, the global block in `Caddyfile.example`, and the
-  `dumbtunnel` systemd unit. They change only when the user asks.
+  `dumbtunnel` systemd unit. `.regenerate/SPEC.md` states them, and the spec suite
+  checks them. They change only when the user asks.
 - **Leave Caddy config to the user.** dumbtunnel passes the user's Caddyfile to
   Caddy and never writes or checks it. A setting every user needs belongs in the
   global block of `Caddyfile.example`.
-- **Keep versions in one place.** The dumbpipe version lives in `install.sh`, image
-  versions in `test/Dockerfile`, and action versions in the workflow files. Do not
-  repeat them in docs, comments or tests.
+- **Keep versions in one place.** The dumbpipe release is named in section 2 of
+  `.regenerate/SPEC.md` and in `install.sh`, and the spec suite checks that they
+  agree. Image versions live in `test/Dockerfile`, and action versions in the
+  workflow files. Do not repeat them anywhere else.
 - **Ask before adding a dependency**, on the laptop, on the relay or in CI.
-- **Keep the docs in step.** A change in behavior updates the scripts, the test and
-  `README.md` together.
+- **Keep the docs in step.** A change in behavior updates the scripts,
+  `.regenerate/SPEC.md`, the spec suite and `README.md` together. A new
+  design choice gets an entry in `.regenerate/DECISIONS.md`.
 
 ## Tests
 
-- The test runs only in Docker, under its own `COMPOSE_PROJECT_NAME`. It must never
-  touch containers it did not start.
+- The tests run only in Docker, under their own `COMPOSE_PROJECT_NAME`. They must
+  never touch containers they did not start, and never run on the host.
+- The spec suite looks only at what a user could see, so it can judge a rebuild.
+  Check what the scripts do, not how they do it.
 - Never loosen a test to make code pass. If a test is wrong, tell the user before you
   change it.
-- The test uses Pebble, never a real CA, and the `.test` domain.
-- The test dials through n0's relays and DNS, so it needs the network.
+- The tests use Pebble or a stand-in, never a real CA, and the `.test` domain.
+- The tests dial through n0's relays and DNS, so they need the network.
 
 ## Upstream bugs
 

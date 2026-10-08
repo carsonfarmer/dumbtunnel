@@ -10,12 +10,12 @@ permissions:
 
 jobs:
   test:
-    name: End to end
+    name: Spec suite
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
       # Uses the n0 relays and DNS to find the laptop, so it needs the network.
       - name: Test
-        run: test/run.sh
+        run: .regenerate/check.sh cli relay e2e

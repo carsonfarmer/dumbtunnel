@@ -1,5 +1,7 @@
 # dumbtunnel
 
+[![Regenerative software](https://img.shields.io/badge/regenerative-software-4f6fd8)](https://github.com/carsonfarmer/dumbtunnel/blob/main/.regenerate/README.md)
+
 dumbtunnel is `caddy run`, reachable from the internet through a server that can't
 read your traffic. Copy `Caddyfile.example` to `Caddyfile`, put your sites at the
 end, and run `dumbtunnel` next to it:
@@ -201,15 +203,25 @@ directly, and most traffic does not touch n0's relay servers.
 ## Testing
 
 ```bash
-test/run.sh
+.regenerate/check.sh
 ```
 
-runs an end-to-end test in Docker. A laptop container serves a page, a relay
-container forwards to it, and [Pebble](https://github.com/letsencrypt/pebble), Let's
-Encrypt's test CA, issues the certificate through the relay. A client then fetches
-the page through the relay and again straight over iroh. The test needs the network,
-because iroh finds the laptop through n0's servers. Set `RUST_LOG` to see more of
-dumbpipe's logs.
+checks the scripts against the [spec](.regenerate/SPEC.md), in Docker. It lints
+them, runs `dumbtunnel` through its signals and failures with the real dumbpipe and
+Caddy, and runs `install.sh` against stand-ins for systemd and iptables. Last, it
+runs `test/run.sh`, the end-to-end test. There a laptop container serves a page, a
+relay container forwards to it, and [Pebble](https://github.com/letsencrypt/pebble),
+Let's Encrypt's test CA, issues the certificate through the relay. A client then
+fetches the page through the relay and again straight over iroh. The tests need the
+network, because iroh finds the laptop through n0's servers. Set `RUST_LOG` to see
+more of dumbpipe's logs.
+
+## Regenerating this project
+
+dumbtunnel can be rebuilt from its description. [`.regenerate/`](.regenerate/README.md)
+holds the spec, the design decisions, a prompt for a fresh agent, and the suite that
+checks a rebuild. Its README says how to run one, and
+[`PROVENANCE.md`](.regenerate/PROVENANCE.md) records each attempt.
 
 ## License
 
