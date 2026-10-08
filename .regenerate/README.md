@@ -109,6 +109,8 @@ check the last ledger row and decide how much that run proves.
 
 ## Working on the suite
 
+- `check.sh` runs all four steps. Name steps to run only those, such as
+  `check.sh static cli`.
 - Everything but `static` runs in Docker, in the image from `test/Dockerfile`, under
   `COMPOSE_PROJECT_NAME`. It defaults to `dumbtunnel-check`. Give each concurrent run
   its own name, and never run the suite on the host.

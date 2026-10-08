@@ -26,18 +26,20 @@ repository holds the glue.
 ## Commands
 
 ```bash
-.regenerate/check.sh                         # the spec suite, needs Docker and the network
-.regenerate/check.sh static cli              # only these steps: static, cli, relay, e2e
-RUST_LOG='warn,iroh=debug' test/run.sh       # the end-to-end test, with iroh's debug logs
-docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable test/*.sh .regenerate/*.sh dumbertunnel
+test/run.sh                                     # the end-to-end test, in Docker, needs the network
+RUST_LOG='warn,iroh=debug' test/run.sh          # the same, with iroh's debug logs
+shellcheck dumbtunnel install.sh dumbertunnel test/*.sh
 ```
 
-Run the spec suite, and shellcheck on the test scripts and `dumbertunnel`, before you
-call a change done.
-Everything but `static` runs in Docker. To try the laptop side on the host, set `DUMBTUNNEL_DIR` and
-`XDG_DATA_HOME` to scratch directories, so the run touches neither the real key nor
-Caddy's data. On macOS, Go ignores `SSL_CERT_FILE`, so to use the test's Pebble, add
-`trusted_roots` to the `cert_issuer` block.
+Run the end-to-end test and shellcheck before you call a change done. Without a
+local shellcheck, run
+`docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable` with the same
+files.
+
+To try the laptop side on the host, set `DUMBTUNNEL_DIR` and `XDG_DATA_HOME` to
+scratch directories, so the run touches neither the real key nor Caddy's data. On
+macOS, Go ignores `SSL_CERT_FILE`, so to use the test's Pebble, add `trusted_roots`
+to the `cert_issuer` block.
 
 ## Plan before you build
 
