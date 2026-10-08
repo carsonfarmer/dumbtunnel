@@ -1,0 +1,65 @@
+#!/bin/sh
+# dumbtunnel serves local ports at public HTTPS names, through a relay that
+# runs dumbpipe. Caddy holds the certificates, so the relay sees only
+# encrypted bytes. See README.md.
+set -eu
+
+dir=${DUMBTUNNEL_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/dumbtunnel}
+mkdir -p "$dir"
+if [ ! -s "$dir/secret" ]; then
+	(umask 077 && head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' >"$dir/secret")
+fi
+
+case ${1:-} in
+ticket) ;;
+"")
+	if [ ! -f "$dir/Caddyfile" ]; then
+		echo "usage: dumbtunnel [NAME=]PORT... | dumbtunnel ticket" >&2
+		exit 2
+	fi
+	;;
+*)
+	: "${DUMBTUNNEL_DOMAIN:?set it to your domain, such as you.duckdns.org}"
+	cat >"$dir/Caddyfile" <<'EOF'
+{
+	admin off
+	https_port {$DUMBTUNNEL_PORT:8443}
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+	cert_issuer acme {$DUMBTUNNEL_ACME_CA:https://acme-v02.api.letsencrypt.org/directory} {
+		disable_http_challenge
+	}
+}
+EOF
+	for route; do
+		case $route in
+		*=*) host=${route%%=*}.$DUMBTUNNEL_DOMAIN up=${route#*=} ;;
+		*) host=$DUMBTUNNEL_DOMAIN up=$route ;;
+		esac
+		case $up in *[!0-9]*) ;; *) up=localhost:$up ;; esac
+		printf '\n%s {\n\treverse_proxy %s\n}\n' "$host" "$up" >>"$dir/Caddyfile"
+		echo "https://$host -> $up"
+	done
+	;;
+esac
+
+rm -f "$dir/fifo" && mkfifo "$dir/fifo"
+IROH_SECRET=$(cat "$dir/secret") dumbpipe listen-tcp -v --host "127.0.0.1:${DUMBTUNNEL_PORT:-8443}" >&2 2>"$dir/fifo" &
+pid=$!
+trap 'kill $pid 2>/dev/null; rm -f "$dir/fifo"' EXIT
+trap 'exit 130' INT TERM
+
+# Once online, dumbpipe prints a short ticket: the laptop's ID and its iroh
+# home relay. With it, the VM can reach the laptop before iroh's DNS has its
+# address. Caddy waits for it too, so its first certificate challenge works.
+exec 3<"$dir/fifo"
+ticket=$(awk '/^or:$/ { getline; print $3; exit }' <&3)
+if [ "${1:-}" = ticket ]; then
+	echo "$ticket"
+	exit
+fi
+echo "ticket: $ticket"
+cat <&3 >&2 &
+caddy run --config "$dir/Caddyfile" --adapter caddyfile

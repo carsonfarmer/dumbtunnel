@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, ci]
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /test
+    schedule:
+      interval: weekly
+    labels: [dependencies, docker]
+    groups:
+      images:
+        patterns: ["*"]

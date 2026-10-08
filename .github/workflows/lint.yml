@@ -1,0 +1,37 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: shellcheck
+        run: shellcheck dumbtunnel install.sh test/*.sh
+
+  size:
+    name: Size budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Counts lines that are neither blank nor comments.
+      - name: Check the size budget
+        run: |
+          fail=0
+          for budget in dumbtunnel:60 install.sh:40; do
+            f=${budget%:*} max=${budget#*:}
+            n=$(grep -cvE '^[[:space:]]*(#|$)' "$f")
+            echo "$f: $n of $max lines"
+            [ "$n" -le "$max" ] || { echo "::error file=$f::$n lines, over the budget of $max"; fail=1; }
+          done
+          exit $fail

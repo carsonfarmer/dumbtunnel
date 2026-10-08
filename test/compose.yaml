@@ -1,0 +1,73 @@
+# The end-to-end test. Run it with test/run.sh, which sets TICKET.
+#
+# The laptop serves api.example.test from a local port. The relay forwards
+# its port 443 to the laptop over iroh. Pebble issues the certificate with a
+# TLS-ALPN-01 challenge sent through the relay. The client then fetches the
+# page through the relay, and again straight over iroh.
+name: ${COMPOSE_PROJECT_NAME:-dumbtunnel-test}
+
+x-test: &test
+  build:
+    context: ..
+    dockerfile: test/Dockerfile
+
+services:
+  pebble:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile
+      target: pebble
+    environment:
+      PEBBLE_VA_NOSLEEP: "1"
+
+  laptop:
+    <<: *test
+    user: laptop
+    environment:
+      DUMBTUNNEL_DOMAIN: example.test
+      DUMBTUNNEL_ACME_CA: https://pebble:14000/dir
+      SSL_CERT_FILE: /etc/pebble.minica.pem
+      RUST_LOG: ${RUST_LOG:-warn}
+    volumes:
+      - laptop:/home/laptop/.config/dumbtunnel
+    command: dumbtunnel api=3000
+    # In real use the relay is up first. Here, without the wait, the first
+    # challenge can reach the relay before it listens, and Caddy retries a
+    # minute later.
+    depends_on:
+      pebble:
+        condition: service_started
+      relay:
+        condition: service_healthy
+
+  app:
+    <<: *test
+    network_mode: service:laptop
+    command: caddy respond --listen 127.0.0.1:3000 "hello from localhost:3000"
+
+  relay:
+    <<: *test
+    command: dumbpipe connect-tcp --addr 0.0.0.0:443 ${TICKET:-}
+    environment:
+      RUST_LOG: ${RUST_LOG:-warn}
+    # dumbpipe listens only once it is online.
+    healthcheck:
+      test: [CMD, nc, -z, 127.0.0.1, "443"]
+      interval: 1s
+      start_interval: 200ms
+      start_period: 30s
+    networks:
+      default:
+        aliases: [api.example.test]
+
+  client:
+    <<: *test
+    depends_on: [pebble, laptop, app, relay]
+    environment:
+      TICKET: ${TICKET:-}
+    volumes:
+      - ./client.sh:/client.sh:ro
+    command: sh /client.sh
+
+volumes:
+  laptop:
