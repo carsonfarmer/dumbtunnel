@@ -30,10 +30,11 @@ RUST_LOG='warn,iroh=debug' test/run.sh          # the same, with iroh's debug lo
 shellcheck dumbtunnel install.sh dumbertunnel test/*.sh
 ```
 
-Run the end-to-end test and shellcheck before you call a change done. Without a
-local shellcheck, run
-`docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:stable` with the same
-files.
+Run the end-to-end test and shellcheck before you call a change done. CI uses the
+shellcheck version in `.github/workflows/lint.yml`, and older ones flag more. Without
+that version locally, run
+`docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:<version>` with the
+same files.
 
 To try the laptop side on the host, set `DUMBTUNNEL_DIR` and `XDG_DATA_HOME` to
 scratch directories, so the run touches neither the real key nor Caddy's data. On
