@@ -43,12 +43,13 @@ Requests and findings during the build session changed the design:
 
 ## Upstream problems found during the build
 
-None of these is reported yet, and none has a workaround here.
+None of these has a workaround here.
 
 | Problem | Fix | Workaround removed |
 | --- | --- | --- |
-| On Ctrl-C, dumbpipe `v0.39.0` logs an ERROR that its iroh endpoint was dropped without `Endpoint::close`. | not reported | no workaround |
-| The relay's dumbpipe logs `WARN dumbpipe: error handling connection: connection lost` for connections that a browser simply closed. | not reported | no workaround |
+| On Ctrl-C, dumbpipe `v0.39.0` logs an ERROR that its iroh endpoint was dropped without `Endpoint::close`. | [dumbpipe#98](https://github.com/n0-computer/dumbpipe/pull/98), not released yet | no workaround |
+| The relay's dumbpipe logs `WARN dumbpipe: error handling connection: connection lost` often, and does not say why. It may be the race in [dumbpipe#89](https://github.com/n0-computer/dumbpipe/issues/89). | not reported | no workaround |
+| On a relay without IPv6, dumbpipe `v0.39.0` logs a `noq_udp` WARN for each send to an IPv6 address. While the laptop is down, it logs `failed closing path err=MultipathNotNegotiated`. | [noq#759](https://github.com/n0-computer/noq/pull/759) and [noq#771](https://github.com/n0-computer/noq/pull/771), not in a dumbpipe release yet | no workaround |
 
 ## Regeneration ledger
 
