@@ -15,13 +15,12 @@ repository holds the glue.
 | Where | What it is |
 | --- | --- |
 | `dumbtunnel` | The laptop side. It starts dumbpipe and Caddy. |
-| `dumbertunnel` | A helper for one site. It writes a Caddyfile and runs `dumbtunnel` on it. It is outside the spec and the suite. |
+| `dumbertunnel` | A helper for one site. It writes a Caddyfile and runs `dumbtunnel` on it. |
 | `Caddyfile.example` | The user's starting point. Its global block makes Caddy work through the relay. |
 | `install.sh` | The relay side. It installs dumbpipe and a systemd service. |
-| `.regenerate/` | The spec, the decisions, the rebuild prompt and the spec suite. See its [README](.regenerate/README.md). |
-| `test/` | The end-to-end test, in Docker, with Pebble as the CA. The spec suite runs it. |
+| `test/` | The end-to-end test, in Docker, with Pebble as the CA. |
 | `SETUP.md` | The guide an agent follows to set dumbtunnel up with a person. |
-| `.github/` | CI for the spec suite, and the Dependabot config. |
+| `.github/` | CI for the tests and shellcheck, and the Dependabot config. |
 
 ## Commands
 
@@ -62,32 +61,28 @@ skill to interview the user before you write code.
 - **Treat the interface as a contract.** Users depend on the command line, the
   environment variables, the stdout of `dumbtunnel` and `dumbtunnel ticket`, the
   file names in `DUMBTUNNEL_DIR`, the global block in `Caddyfile.example`, and the
-  `dumbtunnel` systemd unit. `.regenerate/SPEC.md` states them, and the spec suite
-  checks them. They change only when the user asks.
+  `dumbtunnel` systemd unit. CI checks them, and they change only when the user
+  asks.
 - **Leave Caddy config to the user.** dumbtunnel passes the user's Caddyfile to
   Caddy and never writes or checks it. A setting every user needs belongs in the
   global block of `Caddyfile.example`.
-- **Keep `dumbertunnel` outside the contract.** It is a helper. The spec, the
-  decisions, the spec suite and the size budget do not cover it, and a rebuild
-  leaves it alone. It writes its own copy of the first block of
+- **Keep `dumbertunnel` outside the contract.** It is a helper, and the size budget
+  does not cover it. It writes its own copy of the first block of
   `Caddyfile.example`, the settings that make Caddy work through the relay, so a
   change to that block goes in both. CI only runs shellcheck on it, so try a change
   to it by hand, in Docker.
-- **Keep versions in one place.** The dumbpipe release is named in section 2 of
-  `.regenerate/SPEC.md` and in `install.sh`, and the spec suite checks that they
-  agree. Image versions live in `test/Dockerfile`, and action versions in the
-  workflow files. Do not repeat them anywhere else.
+- **Keep versions in one place.** The dumbpipe release lives in `install.sh`, image
+  versions in `test/Dockerfile`, and action and tool versions in the workflow files.
+  Do not repeat them in docs, comments or tests.
 - **Ask before adding a dependency**, on the laptop, on the relay or in CI.
-- **Keep the docs in step.** A change in behavior updates the scripts,
-  `.regenerate/SPEC.md`, the spec suite, `README.md` and `SETUP.md` together. A new
-  design choice gets an entry in `.regenerate/DECISIONS.md`.
+- **Keep the docs in step.** A change in behavior updates the scripts, their tests,
+  `README.md` and `SETUP.md` together.
 
 ## Tests
 
 - The tests run only in Docker, under their own `COMPOSE_PROJECT_NAME`. They must
   never touch containers they did not start, and never run on the host.
-- The spec suite looks only at what a user could see, so it can judge a rebuild.
-  Check what the scripts do, not how they do it.
+- The tests check what a user could see, not how the scripts do it.
 - Never loosen a test to make code pass. If a test is wrong, tell the user before you
   change it.
 - The tests use Pebble or a stand-in, never a real CA, and the `.test` domain.

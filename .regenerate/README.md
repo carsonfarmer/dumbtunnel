@@ -111,6 +111,9 @@ check the last ledger row and decide how much that run proves.
 
 - `check.sh` runs all four steps. Name steps to run only those, such as
   `check.sh static cli`.
+- A change in behavior updates `SPEC.md` and the suite with the scripts. A new
+  design choice gets an entry in `DECISIONS.md`. A new dumbpipe release goes in
+  `SPEC.md` and `install.sh`.
 - Everything but `static` runs in Docker, in the image from `test/Dockerfile`, under
   `COMPOSE_PROJECT_NAME`. It defaults to `dumbtunnel-check`. Give each concurrent run
   its own name, and never run the suite on the host.
