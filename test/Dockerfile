@@ -1,8 +1,8 @@
 # Images for the end-to-end test. Pebble is Let's Encrypt's test CA. The
 # last stage plays the laptop, the relay and the browser.
-FROM caddy:2.11.7 AS caddy
+FROM caddy:2.11.8 AS caddy
 
-FROM ghcr.io/letsencrypt/pebble:2.10.1 AS pebble
+FROM ghcr.io/letsencrypt/pebble:2.10.3 AS pebble
 COPY test/pebble.json /test/config/pebble-config.json
 
 FROM alpine:3.24
